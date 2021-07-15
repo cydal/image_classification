@@ -167,6 +167,7 @@ def get_stats(images_array):
   print(' - min:', np.min(images_array))
   print(' - max:', np.max(images_array))
 
+  print('Divide by 255')
   images_array = images_array / 255.0
 
   mean = np.mean(images_array, axis=tuple(range(images_array.ndim-1)))
@@ -177,6 +178,39 @@ def get_stats(images_array):
 
   return([mean, std])
 
+def get_stats_batch(images_array):
+  """
+  Args:
+      images_array (numpy array): Image array
+  Returns:
+      mean: per channel mean
+      std: per channel std
+  """
+  batch = 100
+  steps = images_array.shape[0] // 100
+
+  print('[Train]')
+  print(' - Numpy Shape:', images_array.shape)
+  #print(' - Tensor Shape:', images_array.shape)
+  print(' - min:', np.min(images_array))
+  print(' - max:', np.max(images_array))
+
+  print('Divide by 255')
+  images_array = images_array / 255.0
+
+  std, mean = [], []
+
+  print('Computing mean & std')
+  for i in range(steps):
+    mean.append(np.mean(images_array[i*batch:batch+(i*batch)], axis=tuple(range(images_array.ndim-1))))
+    std.append(np.std(images_array[i*batch:batch+(i*batch)], axis=tuple(range(images_array.ndim-1))))
+
+  mean, std = np.array(mean).mean(axis=0), np.array(std).mean(axis=0)
+
+  print(f'\nDataset Mean - {mean}')
+  print(f'Dataset Std - {std} ')
+
+  return([mean, std])
 
 
 def get_train_transform(MEAN, STD):
@@ -215,8 +249,8 @@ def get_train_transforms(h, w, mu, std):
                             A.Resize(h, w, cv2.INTER_NEAREST),
                             A.CenterCrop(h, w),
                             A.Cutout(max_h_size=16, max_w_size=16),
-                            A.Normalize(mean=(MEAN), 
-                                        std=STD),
+                            A.Normalize(mean=(mu), 
+                                        std=std),
                             ToTensorV2()
     ])
 
@@ -235,8 +269,8 @@ def get_val_transforms(h, w, mu, std):
     val_transforms = A.Compose([
                             A.Resize(h, w, cv2.INTER_NEAREST),
                             A.CenterCrop(h, w),
-                            A.Normalize(mean=(MEAN), 
-                                        std=STD),
+                            A.Normalize(mean=(mu), 
+                                        std=std),
                             ToTensorV2()
     ])
 

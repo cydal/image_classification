@@ -31,6 +31,8 @@ if __name__ == "__main__":
 
     labelEncoder = LabelEncoder()
     y = labelEncoder.fit_transform(train_df["label"])
+
+    print("[INFO] y:", np.min(y), np.max(y))
     print("[INFO] Label Encoding:", labelEncoder.classes_)
 
     # split data
@@ -64,21 +66,23 @@ if __name__ == "__main__":
     print(f"----------To Numpy Array----------")
     image_array = to_array(train_df["fname"])
 
+    #image_array = image_array.reshape((-1, 3, 64, 64))
+
     print(f"----------Compute image mean & std----------")    
-    mean, std = get_stats(image_array)
+    mean, std = get_stats_batch(image_array)
 
     image_array = None
 
     print(f"----------Load and Transform Images----------")
     train_transforms = get_train_transforms(params.HEIGHT,
                                       params.WIDTH,
-                                      params.MEANS,
-                                      params.STDS)
+                                      mean,
+                                      std)
 
     val_transforms = get_val_transforms(params.HEIGHT,
                                       params.WIDTH,
-                                      params.MEANS,
-                                      params.STDS)
+                                      mean,
+                                      std)
 
     train_dataset = ImagesDataset(X_train, y_train, None, train_transforms)
     val_dataset = ImagesDataset(X_val, y_val, None, val_transforms)
@@ -104,32 +108,32 @@ if __name__ == "__main__":
 
     dataloaders_dict = {"train": train_loader, "val": val_loader}
 
+    device = get_device()
+    print(f"----------Device type - {device}----------")
+
+    
     # Set optimzer & lr_scheduler
     if params.NUM_CLASSES < 2:
         criterion = nn.BCEWithLogitsLoss(weight=torch.from_numpy(cws)).to(device)
     else:
         criterion = nn.CrossEntropyLoss().to(device)
 
-    optimizer = torch.optim.SGD(net.parameters(), lr=0.01, momentum=0.9)
+    model = ResNet18().to(device)
+
+    optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
     optimizer,
     max_lr=params.LR * 100,
     steps_per_epoch=len(train_loader),
     epochs=params.EPOCHS)
-    
-    print(f"----------Device type - {device}----------")
-    device = get_device()
+
 
     print(f"----------Model Summary----------")
     get_summary(model, device)
 
-
-    model = ResNet18().to(device)
-
-
     print(f"----------Training Model----------")
-    results = train_model(model, criterion, device, trainloader, testloader, optimizer, scheduler, EPOCHS)
+    results = train_model(model, criterion, device, train_loader, val_loader, optimizer, scheduler, params.EPOCHS)
 
     torch.save(model, params.SAVE_MODEL_PATH)
 
