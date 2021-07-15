@@ -1,20 +1,23 @@
 import torch
 import torchvision
 from torchsummary import summary
+from torch.utils.data import Dataset
 
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
-
-from tqdm import tqdm
-import matplotlib.pyplot as plt
 import cv2
+from PIL import Image
 
 
 from torch.optim.lr_scheduler import OneCycleLR
 import torch.optim as optim
 
 import numpy as np
+from tqdm import tqdm
+import matplotlib.pyplot as plt
+
+
 
 train_losses = []
 test_losses = []
@@ -22,24 +25,101 @@ train_acc = []
 test_acc = []
 
 
+class ImagesDataset(Dataset):
+    """Image Classification Dataset"""
+    def __init__(self, img_paths, labels=None, root_dir: str = None, transform=None):
+        """
+        Args:
+            img_paths (pd.Series): Path to the images.
+            labels (np.ndarray) : list or ndarray containing labels corresponding to images
+            transform (callable, optional): Optional transform to be applied
+                on a sample.
+        """
+        self.img_paths = img_paths
+        self.labels = labels
+        self.root_dir = root_dir
+        self.transform = transform
 
-classes = ["airplane", "automobile", "bird", "cat", "deer", 
-           "dog", "frog", "horse", "ship", "truck"]
+    def __len__(self):
+        return len(self.img_paths)
 
+    def __getitem__(self, idx):
+        
+        if self.root_dir:
+          img_filename = os.path.join(self.root_dir, self.img_paths.iloc[idx])
+        else:
+          img_filename = self.img_paths.iloc[idx]
 
-
-class Cifar10SearchDataset(torchvision.datasets.CIFAR10):
-    def __init__(self, root="~/data/cifar10", train=True, download=True, transform=None):
-        super().__init__(root=root, train=train, download=download, transform=transform)
-
-    def __getitem__(self, index):
-        image, label = self.data[index], self.targets[index]
-
+        img = np.array(Image.open(img_filename).convert("RGB"))
         if self.transform is not None:
-            transformed = self.transform(image=image)
-            image = transformed["image"]
+            img = self.transform(image=img)["image"]
+        if self.labels is not None:
+            return img, self.labels[idx]
+        else:
+            return img
 
-        return image, label
+
+
+class Params:
+    """Load hyperparameters from a json file
+    Example:
+    ```
+    params = Params(json_path)
+    print(params.learning_rate)
+    params.learning_rate = 0.5
+    ```
+    """
+
+    def __init__(self, json_path):
+        self.update(json_path)
+
+    def save(self, json_path):
+        """Saves parameters to json file"""
+        with open(json_path, "w") as f:
+            json.dump(self.__dict__, f, indent=4)
+
+    def update(self, json_path):
+        """Loads parameters from json file"""
+        with open(json_path) as f:
+            params = json.load(f)
+            self.__dict__.update(params)
+
+    def __str__(self) -> str:
+        return str(self.__dict__)
+
+    @property
+    def dict(self):
+        """Gives dict-like access to Params instance by `params.dict['learning_rate']`"""
+        return self.__dict__
+
+
+def datasets_to_df(ds_path: str):
+    """
+    Convert folder path to DataFrame
+    Args:
+        ds_path (string): Path to dataset
+    Returns:
+        pd.DataFrame : A pandas dataframe containing paths to dataset and labels.
+    """
+
+    if not os.path.exists:
+        raise FileNotFoundError(f"Directory Dataset not found: {ds_path}")
+
+    filenames = glob2.glob(os.path.join(ds_path, "*/**.jpg"))
+
+    labels = []
+    img_filenames = []
+
+    for f in filenames:
+      labels.append(f.split("/")[-2])
+      img_filenames.append(f)
+
+    df = pd.DataFrame({
+        "fname": img_filenames,
+        "label": labels
+    })
+
+    return(df)
 
 
 
@@ -64,11 +144,6 @@ class UnNormalize(object):
 def get_train_transform(MEAN, STD, PAD=4):
 
     train_transform = A.Compose([
-                                A.PadIfNeeded(min_height=32+PAD, 
-                                            min_width=32+PAD, 
-                                            border_mode=cv2.BORDER_CONSTANT,
-                                            value=(MEAN)),
-                                A.RandomCrop(32, 32),
                                 A.Cutout(max_h_size=16, max_w_size=16),
                                 A.Normalize(mean=(MEAN), 
                                             std=STD),
@@ -92,7 +167,7 @@ def get_test_transform(MEAN, STD):
 def get_summary(model, device):
   """
   Args:
-      model (torch.nn Model): Original data with no preprocessing
+      model (torch.nn Model): 
       device (str): cuda/CPU
   """
   print(summary(model, input_size=(3, 32, 32)))
@@ -125,38 +200,43 @@ def get_stats(trainloader):
   return([mean, std])
 
 
-def get_train_loader(transform=None):
-  """
-  Args:
-      transform (transform): Albumentations transform
-  Returns:
-      trainloader: DataLoader Object
-  """
-  if transform:
-    trainset = Cifar10SearchDataset(transform=transform)
-  else:
-    trainset = Cifar10SearchDataset(root="~/data/cifar10", train=True, 
-                                    download=True)
-  trainloader = torch.utils.data.DataLoader(trainset, batch_size=128,
-                                            shuffle=True, num_workers=2)
-  return(trainloader)
+def get_train_transforms(h, w, mu, std):
+    """
+    Args:
+        h (int): image height
+        w (int):image width
+        mu (array): image mean
+        std (array): standard deviation
+    Returns:
+        train_transforms (Albumentation): Transform Object
+    """
 
+    train_transforms = A.Compose([
+    A.Resize(h, w, cv2.INTER_NEAREST),
+    A.CenterCrop(h, w),
+    A.Normalize(mean=mu, std=std),
+    ToTensor()
+    ])
 
-def get_test_loader(transform=None):
-  """
-  Args:
-      transform (transform): Albumentations transform
-  Returns:
-      testloader: DataLoader Object
-  """
-  if transform:
-    testset = Cifar10SearchDataset(transform=transform, train=False)
-  else:
-    testset = Cifar10SearchDataset(train=False)
-  testloader = torch.utils.data.DataLoader(testset, batch_size=128, 
-                                         shuffle=False, num_workers=2)
+    return(train_transforms)
 
-  return(testloader)
+def get_val_transforms(h, w, mu, std):
+    """
+    Args:
+        h (int): image height
+        w (int):image width
+        mu (array): image mean
+        std (array): standard deviation
+    Returns:
+        val_transforms (Albumentation): Transform Object
+    """
+    val_transforms = A.Compose([
+    A.Resize(h, w, cv2.INTER_NEAREST),
+    A.Normalize(mean=mu, std=std),
+    ToTensor()
+    ])
+
+    return(val_transforms)
 
 
 def get_device():
@@ -182,16 +262,17 @@ def get_device():
   return(device)
 
 
-def superimpose(heatmap, img, denorm):
-  img = np.transpose(denorm(img.cpu()), (1, 2, 0))
-  heatmap = cv2.resize(heatmap.numpy(), (img.shape[1], img.shape[0]))
-  heatmap = np.uint8(255*heatmap)
-  heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-  superimposed_img = (heatmap * 0.4) + 255*img.numpy()
-  return((heatmap, superimposed_img/superimposed_img.max()))
-
 
 def train(model, device, criterion, train_loader, optimizer, epoch):
+  """
+  Args:
+      model (torch.nn Model): 
+      device (str): device type
+      criterion (criterion) - Loss Function
+      train_loader (DataLoader) - DataLoader Object
+      optimizer (optimizer) - Optimizer Object
+      epoch (int) - Number of epochs
+  """
   model.train()
   pbar = tqdm(train_loader)
   correct = 0
@@ -226,6 +307,13 @@ def train(model, device, criterion, train_loader, optimizer, epoch):
     train_acc.append(100*correct/processed)
 
 def test(model, device, criterion, test_loader):
+  """
+  Args:
+      model (torch.nn Model): 
+      device (str): device type
+      criterion (criterion) - Loss Function
+      test_loader (DataLoader) - DataLoader Object
+  """
     model.eval()
     test_loss = 0
     correct = 0
@@ -251,7 +339,7 @@ def test(model, device, criterion, test_loader):
 def train_model(model, criterion, device, train_loader, test_loader, optimizer, scheduler, EPOCHS):
   """
   Args:
-      model (torch.nn Model): Original data with no preprocessing
+      model (torch.nn Model): 
       criterion (criterion) - Loss Function
       device (str): cuda/CPU
       train_loader (DataLoader) - DataLoader Object
@@ -269,122 +357,6 @@ def train_model(model, criterion, device, train_loader, test_loader, optimizer, 
 
   results = [train_losses, test_losses, train_acc, test_acc]
   return(results)
-
-
-
-def get_idxs(results, test_targets, device):
-  """
-  Args:
-      results (tensor): predictions
-      test_targets (tensor): Ground truth labels
-
-  Returns:
-      miss_index: index of misclassifier images
-      hit_index: index of correctly classifier images
-  """
-  miss_index = torch.where((results.argmax(dim=1) == torch.tensor(test_targets).to(device)) == False)[0]
-  hit_index = torch.where((results.argmax(dim=1) == torch.tensor(test_targets).to(device)) == True)[0]
-  return((miss_index, hit_index))
-
-
-def show_images_pred(images, targets, preds, denorm):
-  """
-  Args:
-      images (tensor): images array
-      targets (tensor): Ground truth labels
-      preds (tensor): Predictions
-  """
-  plt.figure(figsize=(15 ,15))
-  for i in range(16):
-      plt.subplot(4, 4,i+1)
-      label = classes[targets[i].cpu()]
-      pred = classes[preds[i].cpu().argmax()]
-      plt.title(f"(T)-{label} - (P)-{pred}")
-      plt.imshow(np.transpose(denorm(images[i].cpu()), (1, 2, 0)))
-  plt.show()
-
-
-def gradcam_heatmap(model, results, test_images, device):
-  """
-  Args:
-      model (torch.nn): Torch model
-      test_targets (tensor): Ground truth labels
-      test_images (tensor): images array
-      device (str): Device type
-
-  Returns:
-      heatmaps (tensor): heatmaps array
-  """
-  results[torch.arange(len(results)), 
-          results.argmax(dim=1)].backward(torch.ones_like(results.argmax(dim=1)))
-
-  gradients = model.get_activations_gradient()
-
-  pooled_gradients = torch.mean(gradients, dim=[2, 3])
-
-
-  activations = model.get_activations(test_images.to(device)).detach()
-
-  # weight the channels by corresponding gradients
-  for j in range(activations.shape[0]):
-    for i in range(512):
-        activations[j, i, :, :] *= pooled_gradients[j, i]
-      
-
-  # average the channels of the activations
-  heatmaps = torch.mean(activations, dim=1).squeeze()
-
-
-  # relu on top of the heatmap
-  heatmaps = np.maximum(heatmaps.cpu(), 0)
-
-  # normalize the heatmap
-  heatmaps /= torch.max(heatmaps)
-
-  return(heatmaps)
-
-
-def superimpose(heatmap, img, denorm):
-  """
-  Args:
-      heatmap (tensor): Gradient heatmap
-      img (tensor): Image array
-
-  Returns:
-      superimposed_img (numpy): image array
-  """
-  img = np.transpose(denorm(img.cpu()), (1, 2, 0))
-  heatmap = cv2.resize(heatmap.numpy(), (img.shape[1], img.shape[0]))
-  heatmap = np.uint8(255*heatmap)
-  heatmap = cv2.applyColorMap(heatmap, cv2.COLORMAP_JET)
-  superimposed_img = (heatmap * 0.4) + 255*img.numpy()
-  
-  return(superimposed_img/superimposed_img.max())
-
-def show_images_cam(images, targets, preds, heatmaps, idx, denorm):
-  """
-  Args:
-      images (tensor): Images array
-      targets (tensor): Ground truth labels
-      preds (tensor): Predictions
-      heatmaps (tensor): Gradient heatmaps
-      idx (tensor): Subset index
-
-  Returns:
-      heatmaps (tensor): heatmaps array
-  """
-  images, targets = images[idx], targets[idx]
-  preds, heatmaps = preds[idx], heatmaps[idx]
-
-  plt.figure(figsize=(15 ,15))
-  for i in range(16):
-      plt.subplot(4, 4,i+1)
-      label = classes[targets[i].cpu()]
-      pred = classes[preds[i].cpu().argmax()]
-      plt.title(f"(T)-{label} - (P)-{pred}")
-      plt.imshow(superimpose(heatmaps[i], images[i], denorm))
-      
-  plt.show()
 
 
 def make_plot(results):
