@@ -140,8 +140,43 @@ class UnNormalize(object):
             # The normalize code -> t.sub_(m).div_(s)
         return tensor
 
+def get_summary(model, device):
+  """
+  Args:
+      model (torch.nn Model): 
+      device (str): cuda/CPU
+  """
+  print(summary(model, input_size=(3, 32, 32)))
 
-def get_train_transform(MEAN, STD, PAD=4):
+
+def get_stats(images_array):
+  """
+  Args:
+      images_array (numpy array): Image array
+  Returns:
+      mean: per channel mean
+      std: per channel std
+  """
+
+  print('[Train]')
+  print(' - Numpy Shape:', images_array.shape)
+  print(' - Tensor Shape:', images_array.shape)
+  print(' - min:', np.min(images_array))
+  print(' - max:', np.max(images_array))
+
+  train_data = images_array / 255.0
+
+  mean = np.mean(images_array, axis=tuple(range(images_array.ndim-1)))
+  std = np.std(images_array, axis=tuple(range(images_array.ndim-1)))
+
+  print(f'\nDataset Mean - {mean}')
+  print(f'Dataset Std - {std} ')
+
+  return([mean, std])
+
+
+
+def get_train_transform(MEAN, STD):
 
     train_transform = A.Compose([
                                 A.Cutout(max_h_size=16, max_w_size=16),
@@ -162,44 +197,6 @@ def get_test_transform(MEAN, STD):
     return(test_transform)
 
 
-
-
-def get_summary(model, device):
-  """
-  Args:
-      model (torch.nn Model): 
-      device (str): cuda/CPU
-  """
-  print(summary(model, input_size=(3, 32, 32)))
-
-
-def get_stats(trainloader):
-  """
-  Args:
-      trainloader (trainloader): Original data with no preprocessing
-  Returns:
-      mean: per channel mean
-      std: per channel std
-  """
-  train_data = trainloader.dataset.data
-
-  print('[Train]')
-  print(' - Numpy Shape:', train_data.shape)
-  print(' - Tensor Shape:', train_data.shape)
-  print(' - min:', np.min(train_data))
-  print(' - max:', np.max(train_data))
-
-  train_data = train_data / 255.0
-
-  mean = np.mean(train_data, axis=tuple(range(train_data.ndim-1)))
-  std = np.std(train_data, axis=tuple(range(train_data.ndim-1)))
-
-  print(f'\nDataset Mean - {mean}')
-  print(f'Dataset Std - {std} ')
-
-  return([mean, std])
-
-
 def get_train_transforms(h, w, mu, std):
     """
     Args:
@@ -211,14 +208,16 @@ def get_train_transforms(h, w, mu, std):
         train_transforms (Albumentation): Transform Object
     """
 
-    train_transforms = A.Compose([
-    A.Resize(h, w, cv2.INTER_NEAREST),
-    A.CenterCrop(h, w),
-    A.Normalize(mean=mu, std=std),
-    ToTensor()
+    train_transform = A.Compose([
+                            A.Resize(h, w, cv2.INTER_NEAREST),
+                            A.CenterCrop(h, w),
+                            A.Cutout(max_h_size=16, max_w_size=16),
+                            A.Normalize(mean=(MEAN), 
+                                        std=STD),
+                            ToTensorV2()
     ])
 
-    return(train_transforms)
+    return(train_transform)
 
 def get_val_transforms(h, w, mu, std):
     """
@@ -231,9 +230,11 @@ def get_val_transforms(h, w, mu, std):
         val_transforms (Albumentation): Transform Object
     """
     val_transforms = A.Compose([
-    A.Resize(h, w, cv2.INTER_NEAREST),
-    A.Normalize(mean=mu, std=std),
-    ToTensor()
+                            A.Resize(h, w, cv2.INTER_NEAREST),
+                            A.CenterCrop(h, w),
+                            A.Normalize(mean=(MEAN), 
+                                        std=STD),
+                            ToTensorV2()
     ])
 
     return(val_transforms)
@@ -380,3 +381,14 @@ def make_plot(results):
     axs[1, 1].plot(te_acc)
     axs[1, 1].set_title("Test Accuracy")
     plt.show()
+
+
+def to_array(f_name):
+    """
+    Args:
+        f_name (Pandas Series - str): image file names
+    Returns:
+        images_array (numpy array): images array
+    """
+    images_array = [np.array(Image.open(x)) for x in f_name]
+    return(images_array)

@@ -58,45 +58,81 @@ if __name__ == "__main__":
     inv_class_mapping = {v: k for k, v in class_mapping.items()}
 
 
+    print(f"----------To Numpy Array----------")
+    image_array = to_array(train_df["fname"])
 
     print(f"----------Compute image mean & std----------")    
-    mean, std = get_stats(trainloader)
-
-
-    denorm = UnNormalize(mean, std) 
-
-    print(f"----------Normailizing Images----------")
-    train_transform = get_train_transform(mean, std)
-    test_transform = get_test_transform(mean, std)
+    mean, std = get_stats(image_array)
 
     print(f"----------Load and Transform Images----------")
-    trainloader = get_train_loader(transform=train_transform)
-    testloader = get_test_loader(transform=test_transform)
+    train_transforms = get_train_transforms(params.HEIGHT,
+                                      params.WIDTH,
+                                      params.MEANS,
+                                      params.STDS)
 
+    val_transforms = get_val_transforms(params.HEIGHT,
+                                      params.WIDTH,
+                                      params.MEANS,
+                                      params.STDS)
 
-    device = get_device()
+    train_dataset = ImagesDataset(X_train, y_train, None, train_transforms)
+    val_dataset = ImagesDataset(X_val, y_val, None, val_transforms)
+
+    train_loader = torch.utils.data.DataLoader(train_dataset,
+                                               batch_size=params.BATCH_SIZE,
+                                               pin_memory=True,
+                                               shuffle=True,
+                                               num_workers=params.NUM_WORKERS)
+
+    val_loader = torch.utils.data.DataLoader(val_dataset,
+                                             batch_size=params.BATCH_SIZE,
+                                             pin_memory=True,
+                                             shuffle=False,
+                                             num_workers=params.NUM_WORKERS)
+
+    print(next(iter(train_loader)))
+    im, lbl = next(iter(train_loader))
+    print(im.shape, lbl.shape)
+
+    print("[INFO] Training length:", len(train_loader.dataset))
+    print("[INFO] Validation length:", len(val_loader.dataset))
+
+    dataloaders_dict = {"train": train_loader, "val": val_loader}
+
+    # Set optimzer & lr_scheduler
+    if params.NUM_CLASSES < 2:
+        criterion = nn.BCEWithLogitsLoss(weight=torch.from_numpy(cws)).to(device)
+    else:
+        criterion = nn.CrossEntropyLoss().to(device)
+
+    optimizer = torch.optim.SGD(net.parameters(), lr=0.01, momentum=0.9)
+
+    scheduler = torch.optim.lr_scheduler.OneCycleLR(
+    optimizer,
+    max_lr=params.LR * 100,
+    steps_per_epoch=len(train_loader),
+    epochs=params.EPOCHS)
+    
     print(f"----------Device type - {device}----------")
-
+    device = get_device()
 
     print(f"----------Model Summary----------")
-    model = ResNet18().to(device)
     get_summary(model, device)
 
 
-    model =  ResNet18().to(device)
+    model = ResNet18().to(device)
 
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.SGD(model.parameters(), lr=LR, momentum=MOMENTUM)
-    scheduler = OneCycleLR(optimizer, max_lr=0.05, epochs=EPOCHS, steps_per_epoch=len(trainloader))
 
     print(f"----------Training Model----------")
     results = train_model(model, criterion, device, trainloader, testloader, optimizer, scheduler, EPOCHS)
+
+    torch.save(model, params.SAVE_MODEL_PATH)
 
     print(f"----------Loss & Accuracy Plots----------")
     make_plot(results)
 
 
-    max_images = 128
+    '''max_images = 128
     test_images = [x[0] for x in testloader.dataset]
     test_images = torch.stack(test_images[:max_images])
     test_targets = torch.tensor(testloader.dataset.targets[:max_images]).to(device)
@@ -105,31 +141,9 @@ if __name__ == "__main__":
 
     test_predictions = model(test_images.to(device))
 
-    miss_index, hit_index = get_idxs(test_predictions, test_targets, device)
-
-
-    print(f"----------missclassifid index length is {len(miss_index)}----------")
-    print(f"----------Correctly classified index length is {len(hit_index)}----------")
-
-
     print(f"----------Visualize model predictions----------")
     show_images_pred(test_images, test_targets, test_predictions, denorm)
 
 
     print(f"----------Visualize misclassified predictions----------")
-    show_images_pred(test_images[miss_index], test_targets[miss_index], test_predictions[miss_index], denorm)
-
-
-    print(f"----------Generate heatmaps for test images----------")
-    heatmaps = gradcam_heatmap(model, test_predictions, test_images, device)
-
-
-    hit_maps = heatmaps[hit_index]
-    miss_maps = heatmaps[miss_index]
-
-    print(f"----------isualize misclassified GRADCAM----------")
-    show_images_cam(test_images, test_targets, test_predictions, heatmaps, miss_index, denorm)
-
-
-    print(f"----------Visualize correctly classified GRADCAM----------")
-    show_images_cam(test_images, test_targets, test_predictions, heatmaps, hit_index, denorm)
+    show_images_pred(test_images[miss_index], test_targets[miss_index], test_predictions[miss_index], denorm)'''
