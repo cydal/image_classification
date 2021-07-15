@@ -1,6 +1,8 @@
 from models.resnet import *
 from utils import *
 
+from sklearn.model_selection import train_test_split
+
 
 from torch.optim.lr_scheduler import StepLR, OneCycleLR
 import torch.nn as nn
@@ -9,6 +11,7 @@ import torch.optim as optim
 import argparse
 
 from sklearn.preprocessing import LabelEncoder
+from sklearn.utils import class_weight
 
 
 parser = argparse.ArgumentParser()
@@ -19,7 +22,7 @@ parser.add_argument("--model_dir",
 if __name__ == "__main__":
 
     args = parser.parse_args()
-    json_path = os.path.join(args.model_dir, "params.json")
+    json_path = os.path.join(args.model_dir, "PARAMS.JSON")
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
     params = Params(json_path)
 
@@ -63,6 +66,8 @@ if __name__ == "__main__":
 
     print(f"----------Compute image mean & std----------")    
     mean, std = get_stats(image_array)
+
+    image_array = None
 
     print(f"----------Load and Transform Images----------")
     train_transforms = get_train_transforms(params.HEIGHT,

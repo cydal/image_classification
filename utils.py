@@ -9,6 +9,8 @@ from albumentations.pytorch import ToTensorV2
 import cv2
 from PIL import Image
 
+import glob2
+import pandas as pd
 
 from torch.optim.lr_scheduler import OneCycleLR
 import torch.optim as optim
@@ -17,7 +19,8 @@ import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 
-
+import json
+import os
 
 train_losses = []
 test_losses = []
@@ -105,7 +108,7 @@ def datasets_to_df(ds_path: str):
     if not os.path.exists:
         raise FileNotFoundError(f"Directory Dataset not found: {ds_path}")
 
-    filenames = glob2.glob(os.path.join(ds_path, "*/**.jpg"))
+    filenames = glob2.glob(os.path.join(ds_path, "*/**.JPEG"))
 
     labels = []
     img_filenames = []
@@ -160,11 +163,11 @@ def get_stats(images_array):
 
   print('[Train]')
   print(' - Numpy Shape:', images_array.shape)
-  print(' - Tensor Shape:', images_array.shape)
+  #print(' - Tensor Shape:', images_array.shape)
   print(' - min:', np.min(images_array))
   print(' - max:', np.max(images_array))
 
-  train_data = images_array / 255.0
+  images_array = images_array / 255.0
 
   mean = np.mean(images_array, axis=tuple(range(images_array.ndim-1)))
   std = np.std(images_array, axis=tuple(range(images_array.ndim-1)))
@@ -315,25 +318,25 @@ def test(model, device, criterion, test_loader):
       criterion (criterion) - Loss Function
       test_loader (DataLoader) - DataLoader Object
   """
-    model.eval()
-    test_loss = 0
-    correct = 0
-    with torch.no_grad():
-        for data, target in test_loader:
-            data, target = data.to(device), target.to(device)
-            output = model(data)
-            test_loss += criterion(output, target).item()  # sum up batch loss
-            pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
-            correct += pred.eq(target.view_as(pred)).sum().item()
+  model.eval()
+  test_loss = 0
+  correct = 0
+  with torch.no_grad():
+      for data, target in test_loader:
+          data, target = data.to(device), target.to(device)
+          output = model(data)
+          test_loss += criterion(output, target).item()  # sum up batch loss
+          pred = output.argmax(dim=1, keepdim=True)  # get the index of the max log-probability
+          correct += pred.eq(target.view_as(pred)).sum().item()
 
-    test_loss /= len(test_loader.dataset)
-    test_losses.append(test_loss)
+  test_loss /= len(test_loader.dataset)
+  test_losses.append(test_loss)
 
-    print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
-        test_loss, correct, len(test_loader.dataset),
-        100. * correct / len(test_loader.dataset)))
-    
-    test_acc.append(100. * correct / len(test_loader.dataset))
+  print('\nTest set: Average loss: {:.4f}, Accuracy: {}/{} ({:.2f}%)\n'.format(
+      test_loss, correct, len(test_loader.dataset),
+      100. * correct / len(test_loader.dataset)))
+  
+  test_acc.append(100. * correct / len(test_loader.dataset))
 
 
 
@@ -390,5 +393,5 @@ def to_array(f_name):
     Returns:
         images_array (numpy array): images array
     """
-    images_array = [np.array(Image.open(x)) for x in f_name]
+    images_array = np.array([np.array(Image.open(x).convert("RGB")) for x in f_name])
     return(images_array)

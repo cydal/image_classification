@@ -13,7 +13,7 @@
     "HEIGHT": 256,
 
     "train_path": "",
-    "SAVE_MODEL_PATH": "save_model/resnet50.pth",
+    "SAVE_MODEL_PATH": "save_model/resnet.pth",
 
     "MODEL_NAME": "resnet50",
     "USE_WANDB": true
