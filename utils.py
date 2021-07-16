@@ -149,7 +149,7 @@ def get_summary(model, device):
       model (torch.nn Model): 
       device (str): cuda/CPU
   """
-  print(summary(model, input_size=(3, 32, 32)))
+  print(summary(model.to(device), input_size=(3, 32, 32)))
 
 
 def get_stats(images_array):

@@ -64,25 +64,25 @@ if __name__ == "__main__":
 
 
     print(f"----------To Numpy Array----------")
-    image_array = to_array(train_df["fname"])
+    #image_array = to_array(train_df["fname"])
 
     #image_array = image_array.reshape((-1, 3, 64, 64))
 
     print(f"----------Compute image mean & std----------")    
-    mean, std = get_stats_batch(image_array)
+    #mean, std = get_stats_batch(image_array)
 
     image_array = None
 
     print(f"----------Load and Transform Images----------")
     train_transforms = get_train_transforms(params.HEIGHT,
                                       params.WIDTH,
-                                      mean,
-                                      std)
+                                      params.MEAN,
+                                      params.STD)
 
     val_transforms = get_val_transforms(params.HEIGHT,
                                       params.WIDTH,
-                                      mean,
-                                      std)
+                                      params.MEAN,
+                                      params.STD)
 
     train_dataset = ImagesDataset(X_train, y_train, None, train_transforms)
     val_dataset = ImagesDataset(X_val, y_val, None, val_transforms)
