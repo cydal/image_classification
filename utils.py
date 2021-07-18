@@ -22,6 +22,9 @@ import matplotlib.pyplot as plt
 import json
 import os
 
+from torch_lr_finder import LRFinder
+
+
 train_losses = []
 test_losses = []
 train_acc = []
@@ -432,3 +435,10 @@ def to_array(f_name):
     """
     images_array = np.array([np.array(Image.open(x).convert("RGB")) for x in f_name])
     return(images_array)
+
+
+def lr_finder(model, optimizer, criterion, trainloader, device, end_lr, num_iter):
+
+    lr_finder = LRFinder(model, optimizer, criterion, device=device)
+    lr_finder.range_test(trainloader, end_lr=end_lr, num_iter=num_iter, step_mode="linear")
+    lr_finder.plot()
