@@ -216,29 +216,6 @@ def get_stats_batch(images_array):
   return([mean, std])
 
 
-def get_train_transform(MEAN, STD):
-
-    train_transform = A.Compose([
-                                A.HorizontalFlip(p=0.5),
-                                A.RandomCrop(height=56, width=56),
-                                A.Cutout(max_h_size=56, max_w_size=56),
-                                A.Normalize(mean=(MEAN), 
-                                            std=STD),
-                                ToTensorV2(),
-    ])
-    return(train_transform)
-
-
-def get_test_transform(MEAN, STD):
-
-    test_transform = A.Compose([
-                                A.Normalize(mean=MEAN, 
-                                            std=STD),
-                                ToTensorV2(),
-    ])
-    return(test_transform)
-
-
 def get_train_transforms(h, w, mu, std):
     """
     Args:
@@ -252,9 +229,8 @@ def get_train_transforms(h, w, mu, std):
 
     train_transform = A.Compose([
                             A.HorizontalFlip(p=0.5),
-                            #A.Resize(h, w, cv2.INTER_NEAREST),
                             A.RandomCrop(h, w),
-                            A.Cutout(max_h_size=56, max_w_size=56),
+                            A.Cutout(max_h_size=8, max_w_size=8),
                             A.Normalize(mean=(mu), 
                                         std=std),
                             ToTensorV2()
