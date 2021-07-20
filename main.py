@@ -121,7 +121,7 @@ if __name__ == "__main__":
     model = ResNet18().to(device)
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 
-    lr_finder(model, optimizer, criterion, train_loader, device, 1, 200)
+    #lr_finder(model, optimizer, criterion, train_loader, device, 1, 200)
 
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
     optimizer,
