@@ -124,8 +124,9 @@ if __name__ == "__main__":
     #lr_finder(model, optimizer, criterion, train_loader, device, 1, 200)
 
     scheduler = torch.optim.lr_scheduler.OneCycleLR(
-    optimizer,
-    max_lr=params.LR * 100,
+    optimizer, div_factor=10, final_div_factor=10,
+    pct_start=10/params.EPOCHS,
+    max_lr=params.LR,
     steps_per_epoch=len(train_loader),
     epochs=params.EPOCHS)
 

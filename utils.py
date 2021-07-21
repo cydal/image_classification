@@ -152,7 +152,7 @@ def get_summary(model, device):
       model (torch.nn Model): 
       device (str): cuda/CPU
   """
-  print(summary(model.to(device), input_size=(3, 56, 56)))
+  print(summary(model.to(device), input_size=(3, 64, 64)))
 
 
 def get_stats(images_array):
@@ -228,12 +228,17 @@ def get_train_transforms(h, w, mu, std):
     """
 
     train_transform = A.Compose([
-                            A.HorizontalFlip(p=0.5),
-                            A.RandomCrop(h, w),
-                            A.Cutout(max_h_size=8, max_w_size=8),
-                            A.Normalize(mean=(mu), 
-                                        std=std),
-                            ToTensorV2()
+                            A.Sequential([
+                              A.PadIfNeeded(min_height=72, min_width=72),
+                              A.RandomCrop(h, w),
+                              A.HorizontalFlip(p=0.25),
+                              A.Rotate(limit=15, p=0.5),
+                              A.CoarseDropout(max_holes=1, max_height=8, max_width=8, fill_value=mu),
+                              A.RGBShift(p=0.25),
+                              A.Normalize(mean=(mu), 
+                                          std=std),
+                              ToTensorV2()
+                            ], p=1)
     ])
 
     return(train_transform)
@@ -250,13 +255,13 @@ def get_val_transforms(h, w, mu, std):
     """
     val_transforms = A.Compose([
                             A.Resize(h, w, cv2.INTER_NEAREST),
-                            A.CenterCrop(h, w),
                             A.Normalize(mean=(mu), 
                                         std=std),
                             ToTensorV2()
     ])
 
     return(val_transforms)
+
 
 
 def get_device():
