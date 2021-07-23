@@ -13,11 +13,15 @@ import argparse
 from sklearn.preprocessing import LabelEncoder
 from sklearn.utils import class_weight
 
+import wandb
+
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--model_dir",
                     default=".",
                     help="Directory containing params file")
+
+wandb.init(project="ResNet18_TinyImageNet")
 
 if __name__ == "__main__":
 
@@ -25,6 +29,11 @@ if __name__ == "__main__":
     json_path = os.path.join(args.model_dir, "PARAMS.JSON")
     assert os.path.isfile(json_path), "No json configuration file found at {}".format(json_path)
     params = Params(json_path)
+
+    if params.USE_WANDB:
+        with open(json_path, "r") as f:
+            data = json.load(f)
+        wandb.config.update(data)
 
     train_root_dir = params.train_path
     train_df = datasets_to_df(params.train_path)
