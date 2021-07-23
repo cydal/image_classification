@@ -144,7 +144,7 @@ if __name__ == "__main__":
     get_summary(model, device)
 
     print(f"----------Training Model----------")
-    results = train_model(model, criterion, device, train_loader, val_loader, optimizer, scheduler, params.EPOCHS)
+    results = train_model(model, criterion, device, train_loader, val_loader, optimizer, scheduler, params.EPOCHS, params.USE_WANDB)
 
     torch.save(model, params.SAVE_MODEL_PATH)
 
