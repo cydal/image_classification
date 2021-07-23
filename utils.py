@@ -22,7 +22,10 @@ import matplotlib.pyplot as plt
 import json
 import os
 
+import wandb
+
 from torch_lr_finder import LRFinder
+
 
 
 train_losses = []
@@ -361,7 +364,7 @@ def test(model, device, criterion, test_loader):
 
 
 
-def train_model(model, criterion, device, train_loader, test_loader, optimizer, scheduler, EPOCHS):
+def train_model(model, criterion, device, train_loader, test_loader, optimizer, scheduler, EPOCHS, use_wandb):
   """
   Args:
       model (torch.nn Model): 
@@ -371,6 +374,7 @@ def train_model(model, criterion, device, train_loader, test_loader, optimizer, 
       optimizer (optimizer) - Optimizer Object
       scheduler (scheduler) - scheduler object
       EPOCHS (int) - Number of epochs
+      use_wandb (bool) - use weights & biases for logging
   Returns:
       results (list): Train/test - Accuracy/Loss 
   """
@@ -379,6 +383,15 @@ def train_model(model, criterion, device, train_loader, test_loader, optimizer, 
       train(model, device, criterion, train_loader, optimizer, epoch)
       scheduler.step()
       test(model, device, criterion, test_loader)
+
+      if use_wandb:
+          wandb.log({
+              "epoch": epoch,
+              "Train Loss": train_losses[-1],
+              "Train Acc": train_acc[-1],
+              "Valid Loss": test_losses[-1], 
+              "Valid Acc": test_acc[-1]
+          })
 
   results = [train_losses, test_losses, train_acc, test_acc]
   return(results)
